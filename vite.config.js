@@ -20,5 +20,5 @@ module.exports = {
   build: {
     outDir: 'docs',
   },
-  base: '/cloth-simulation/',
+  base: '/ClothSimulation/',
 };
