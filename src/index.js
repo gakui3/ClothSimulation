@@ -3,19 +3,21 @@ import * as BABYLON from '@babylonjs/core';
 const canvas = document.getElementById('renderCanvas');
 const engine = new BABYLON.Engine(canvas);
 const scene = new BABYLON.Scene(engine);
-const camera = new BABYLON.FreeCamera('camera1', new BABYLON.Vector3(0, 5, -10), scene);
-camera.setTarget(BABYLON.Vector3.Zero());
+// const camera = new BABYLON.FreeCamera('camera1', new BABYLON.Vector3(0, 5, -10), scene);
+const camera = new BABYLON.ArcRotateCamera('Camera', 0, 0, 10, new BABYLON.Vector3(0, 0, 0), scene);
+// camera.setTarget(BABYLON.Vector3.Zero());
+camera.setPosition(new BABYLON.Vector3(0, 0, 10));
 camera.inputs.addMouseWheel();
 
 let spheresV = [];
-const springConstant = 6.0; // N/m
-const l = 1.0; // m
+const springConstant = 10.0; // N/m
+const l = 1; // m
 const dt = 0.03;
-const m = 0.025; // kg
+const m = 0.1; // kg
 const g = -9.8; // m/s^2
+let time = 0;
 
 const oneLineCount = 10;
-const maxLength = l * 1.5;
 
 let spheres = new Array(oneLineCount).fill(null).map(() => new Array(oneLineCount).fill(null));
 let spheresPrevPosition = new Array(oneLineCount)
@@ -66,13 +68,17 @@ function calculateForce(i, k) {
   let upperLeftForce = new BABYLON.Vector3(0, 0, 0); //↖
   let upperRightForce = new BABYLON.Vector3(0, 0, 0); //↗
 
+  let secondLeftForce = new BABYLON.Vector3(0, 0, 0); //←←
+  let secondRightForce = new BABYLON.Vector3(0, 0, 0); //→→
+  let secondUpForce = new BABYLON.Vector3(0, 0, 0); //↑↑
+  let secondDownForce = new BABYLON.Vector3(0, 0, 0); //↓↓
+
   if (i !== 0) {
     //←
     let length = spheres[i][k].position
       .clone()
       .subtract(spheres[i - 1][k].position)
       .length();
-    // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
     const leftVec = spheres[i][k].position
       .clone()
       .subtract(spheres[i - 1][k].position)
@@ -85,12 +91,24 @@ function calculateForce(i, k) {
         .clone()
         .subtract(spheres[i - 1][k + 1].position)
         .length();
-      // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
       const lowerLeftVec = spheres[i][k].position
         .clone()
         .subtract(spheres[i - 1][k + 1].position)
         .normalize();
       lowerLeftForce = lowerLeftVec.scale(-springConstant * (length - l));
+    }
+
+    //←←
+    if (i !== 1) {
+      let length = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i - 2][k].position)
+        .length();
+      const secondLeftVec = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i - 2][k].position)
+        .normalize();
+      secondLeftForce = secondLeftVec.scale(-springConstant * (length - l));
     }
   }
   if (i !== oneLineCount - 1) {
@@ -99,7 +117,6 @@ function calculateForce(i, k) {
       .clone()
       .subtract(spheres[i + 1][k].position)
       .length();
-    // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
     const rightVec = spheres[i][k].position
       .clone()
       .subtract(spheres[i + 1][k].position)
@@ -112,12 +129,24 @@ function calculateForce(i, k) {
         .clone()
         .subtract(spheres[i + 1][k + 1].position)
         .length();
-      // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
       const lowerRightVec = spheres[i][k].position
         .clone()
         .subtract(spheres[i + 1][k + 1].position)
         .normalize();
       lowerRightForce = lowerRightVec.scale(-springConstant * (length - l));
+    }
+
+    //→→
+    if (i !== oneLineCount - 2) {
+      let length = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i + 2][k].position)
+        .length();
+      const secondRightVec = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i + 2][k].position)
+        .normalize();
+      secondRightForce = secondRightVec.scale(-springConstant * (length - l));
     }
   }
   if (k !== 0) {
@@ -126,7 +155,6 @@ function calculateForce(i, k) {
       .clone()
       .subtract(spheres[i][k - 1].position)
       .length();
-    // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
     const upVec = spheres[i][k].position
       .clone()
       .subtract(spheres[i][k - 1].position)
@@ -139,7 +167,6 @@ function calculateForce(i, k) {
         .clone()
         .subtract(spheres[i - 1][k - 1].position)
         .length();
-      // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
       const upperLeftVec = spheres[i][k].position
         .clone()
         .subtract(spheres[i - 1][k - 1].position)
@@ -153,12 +180,24 @@ function calculateForce(i, k) {
         .clone()
         .subtract(spheres[i + 1][k - 1].position)
         .length();
-      // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
       const upperRightVec = spheres[i][k].position
         .clone()
         .subtract(spheres[i + 1][k - 1].position)
         .normalize();
       upperRightForce = upperRightVec.scale(-springConstant * (length - l));
+    }
+
+    //↑↑
+    if (k !== 1) {
+      let length = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i][k - 2].position)
+        .length();
+      const secondUpVec = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i][k - 2].position)
+        .normalize();
+      secondUpForce = secondUpVec.scale(-springConstant * (length - l));
     }
   }
   if (k !== oneLineCount - 1) {
@@ -167,12 +206,24 @@ function calculateForce(i, k) {
       .clone()
       .subtract(spheres[i][k + 1].position)
       .length();
-    // length = BABYLON.Scalar.Clamp(length, 0, maxLength);
     const downVec = spheres[i][k].position
       .clone()
       .subtract(spheres[i][k + 1].position)
       .normalize();
     downForce = downVec.scale(-springConstant * (length - l));
+
+    //↓↓
+    if (k !== oneLineCount - 2) {
+      let length = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i][k + 2].position)
+        .length();
+      const secondDownVec = spheres[i][k].position
+        .clone()
+        .subtract(spheres[i][k + 2].position)
+        .normalize();
+      secondDownForce = secondDownVec.scale(-springConstant * (length - l));
+    }
   }
 
   const force = leftForce
@@ -183,18 +234,29 @@ function calculateForce(i, k) {
     .add(lowerRightForce)
     .add(upperLeftForce)
     .add(upperRightForce)
-    .add(new BABYLON.Vector3(0, m * g, 0));
+    .add(secondLeftForce)
+    .add(secondRightForce)
+    .add(secondUpForce)
+    .add(secondDownForce)
+    .add(new BABYLON.Vector3(0, m * g, 0))
+    .add(new BABYLON.Vector3(0, 0, Math.sin(time) * 0.5));
   return force;
 }
 
 function calculateAcceleration(i, k) {
   const force = calculateForce(i, k);
+  const adjustForce = spheres[i][k].position
+    .clone()
+    .subtract(spheresPrevPosition[i][k])
+    .scale(1 / dt);
+  force.add(adjustForce);
   const a = force.scale(1 / m);
   return a;
 }
 
 // Render every frame
 engine.runRenderLoop(() => {
+  time += dt;
   // let newPos = new Array(spheres.length);
   // let newV = new Array(spheres.length);
 
@@ -254,10 +316,10 @@ engine.runRenderLoop(() => {
 
   let newPos = new Array(oneLineCount).fill(null).map(() => new Array(oneLineCount));
 
-  for (let r = 0; r < 20; r++) {
+  for (let r = 0; r < 10; r++) {
     for (let i = 0; i < spheres.length; i++) {
       for (let k = 0; k < spheres.length; k++) {
-        if (k === oneLineCount - 1 && (i === 0 || i === oneLineCount - 1)) {
+        if (k === oneLineCount - 1) {
           newPos[i][k] = spheres[i][k].position.clone();
           continue;
         }
