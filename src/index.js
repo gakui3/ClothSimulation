@@ -57,7 +57,20 @@ function computeForce(position, prevPosition, nextPosition) {
   return f1.add(f2);
 }
 
-function calculateForce(i, k) {
+function calculateForce(i, k, offset) {
+  let length = spheres[i][k].position
+    .clone()
+    .subtract(spheres[i + offset.x][k + offset.y].position)
+    .length();
+  let vec = spheres[i][k].position
+    .clone()
+    .subtract(spheres[i + offset.x][k + offset.y].position)
+    .normalize();
+  const force = vec.scale(-1 * springConstant * (length - l));
+  return force;
+}
+
+function calculateTotalForce(i, k) {
   let leftForce = new BABYLON.Vector3(0, 0, 0);
   let rightForce = new BABYLON.Vector3(0, 0, 0);
   let upForce = new BABYLON.Vector3(0, 0, 0);
@@ -73,156 +86,85 @@ function calculateForce(i, k) {
   let secondUpForce = new BABYLON.Vector3(0, 0, 0); //↑↑
   let secondDownForce = new BABYLON.Vector3(0, 0, 0); //↓↓
 
+  let secondLowerLeftForce = new BABYLON.Vector3(0, 0, 0); //↙↙
+  let secondLowerRightForce = new BABYLON.Vector3(0, 0, 0); //↘↘
+  let secondUpperLeftForce = new BABYLON.Vector3(0, 0, 0); //↖↖
+  let secondUpperRightForce = new BABYLON.Vector3(0, 0, 0); //↗↗
+
   if (i !== 0) {
     //←
-    let length = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i - 1][k].position)
-      .length();
-    const leftVec = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i - 1][k].position)
-      .normalize();
-    leftForce = leftVec.scale(-springConstant * (length - l));
+    leftForce = calculateForce(i, k, { x: -1, y: 0 });
 
     //↙
     if (k !== oneLineCount - 1) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i - 1][k + 1].position)
-        .length();
-      const lowerLeftVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i - 1][k + 1].position)
-        .normalize();
-      lowerLeftForce = lowerLeftVec.scale(-springConstant * (length - l));
+      lowerLeftForce = calculateForce(i, k, { x: -1, y: 1 });
     }
 
     //←←
     if (i !== 1) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i - 2][k].position)
-        .length();
-      const secondLeftVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i - 2][k].position)
-        .normalize();
-      secondLeftForce = secondLeftVec.scale(-springConstant * (length - l));
+      secondLeftForce = calculateForce(i, k, { x: -2, y: 0 });
+    }
+
+    //↙↙
+    if (k !== oneLineCount - 1 && i !== 1) {
+      secondLowerLeftForce = calculateForce(i, k, { x: -2, y: 1 });
     }
   }
   if (i !== oneLineCount - 1) {
     //→
-    let length = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i + 1][k].position)
-      .length();
-    const rightVec = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i + 1][k].position)
-      .normalize();
-    rightForce = rightVec.scale(-springConstant * (length - l));
+    rightForce = calculateForce(i, k, { x: 1, y: 0 });
 
     //↘
     if (k !== oneLineCount - 1) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i + 1][k + 1].position)
-        .length();
-      const lowerRightVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i + 1][k + 1].position)
-        .normalize();
-      lowerRightForce = lowerRightVec.scale(-springConstant * (length - l));
+      lowerRightForce = calculateForce(i, k, { x: 1, y: 1 });
     }
 
     //→→
     if (i !== oneLineCount - 2) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i + 2][k].position)
-        .length();
-      const secondRightVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i + 2][k].position)
-        .normalize();
-      secondRightForce = secondRightVec.scale(-springConstant * (length - l));
+      secondRightForce = calculateForce(i, k, { x: 2, y: 0 });
+    }
+
+    //↘↘
+    if (k !== oneLineCount - 1 && i !== oneLineCount - 2) {
+      secondLowerRightForce = calculateForce(i, k, { x: 2, y: 1 });
     }
   }
   if (k !== 0) {
     //↑
-    let length = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i][k - 1].position)
-      .length();
-    const upVec = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i][k - 1].position)
-      .normalize();
-    upForce = upVec.scale(-springConstant * (length - l));
+    upForce = calculateForce(i, k, { x: 0, y: -1 });
 
     //↖
     if (i !== 0) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i - 1][k - 1].position)
-        .length();
-      const upperLeftVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i - 1][k - 1].position)
-        .normalize();
-      upperLeftForce = upperLeftVec.scale(-springConstant * (length - l));
+      upperLeftForce = calculateForce(i, k, { x: -1, y: -1 });
     }
 
     //↗
     if (i !== oneLineCount - 1) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i + 1][k - 1].position)
-        .length();
-      const upperRightVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i + 1][k - 1].position)
-        .normalize();
-      upperRightForce = upperRightVec.scale(-springConstant * (length - l));
+      upperRightForce = calculateForce(i, k, { x: 1, y: -1 });
     }
 
     //↑↑
     if (k !== 1) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i][k - 2].position)
-        .length();
-      const secondUpVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i][k - 2].position)
-        .normalize();
-      secondUpForce = secondUpVec.scale(-springConstant * (length - l));
+      secondUpForce = calculateForce(i, k, { x: 0, y: -2 });
+    }
+
+    //↖↖
+    if (i !== 0 && k !== 1) {
+      secondUpperLeftForce = calculateForce(i, k, { x: -1, y: -2 });
+    }
+
+    //↗↗
+    if (i !== oneLineCount - 1 && k !== 1) {
+      secondUpperRightForce = calculateForce(i, k, { x: 1, y: -2 });
     }
   }
   if (k !== oneLineCount - 1) {
     //↓
-    let length = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i][k + 1].position)
-      .length();
-    const downVec = spheres[i][k].position
-      .clone()
-      .subtract(spheres[i][k + 1].position)
-      .normalize();
-    downForce = downVec.scale(-springConstant * (length - l));
+    downForce = calculateForce(i, k, { x: 0, y: 1 });
 
     //↓↓
     if (k !== oneLineCount - 2) {
-      let length = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i][k + 2].position)
-        .length();
-      const secondDownVec = spheres[i][k].position
-        .clone()
-        .subtract(spheres[i][k + 2].position)
-        .normalize();
-      secondDownForce = secondDownVec.scale(-springConstant * (length - l));
+      secondDownForce = calculateForce(i, k, { x: 0, y: 2 });
     }
   }
 
@@ -234,17 +176,21 @@ function calculateForce(i, k) {
     .add(lowerRightForce)
     .add(upperLeftForce)
     .add(upperRightForce)
-    .add(secondLeftForce)
-    .add(secondRightForce)
-    .add(secondUpForce)
-    .add(secondDownForce)
+    // .add(secondLeftForce)
+    // .add(secondRightForce)
+    // .add(secondUpForce)
+    // .add(secondDownForce)
+    // .add(secondLowerLeftForce)
+    // .add(secondLowerRightForce)
+    // .add(secondUpperLeftForce)
+    // .add(secondUpperRightForce)
     .add(new BABYLON.Vector3(0, m * g, 0))
     .add(new BABYLON.Vector3(0, 0, Math.sin(time * 0.5) * 2));
   return force;
 }
 
 function calculateAcceleration(i, k) {
-  const force = calculateForce(i, k);
+  const force = calculateTotalForce(i, k);
   const adjustForce = spheres[i][k].position
     .clone()
     .subtract(spheresPrevPosition[i][k])
@@ -257,62 +203,6 @@ function calculateAcceleration(i, k) {
 // Render every frame
 engine.runRenderLoop(() => {
   time += dt;
-  // let newPos = new Array(spheres.length);
-  // let newV = new Array(spheres.length);
-
-  // for (let i = 1; i < spheres.length - 1; i++) {
-  //   const force = computeForce(
-  //     spheres[i].position,
-  //     spheres[i - 1].position,
-  //     spheres[i + 1].position
-  //   );
-
-  //   const k1_v = force.scale(dt);
-  //   const k1_p = spheresV[i].scale(dt);
-
-  //   const k2_v = computeForce(
-  //     spheres[i].position.add(k1_p.scale(0.5)),
-  //     spheres[i - 1].position,
-  //     spheres[i + 1].position
-  //   ).scale(dt);
-  //   const k2_p = spheresV[i].add(k1_v.scale(0.5)).scale(dt);
-
-  //   const k3_v = computeForce(
-  //     spheres[i].position.add(k2_p.scale(0.5)),
-  //     spheres[i - 1].position,
-  //     spheres[i + 1].position
-  //   ).scale(dt);
-  //   const k3_p = spheresV[i].add(k2_v.scale(0.5)).scale(dt);
-
-  //   const k4_v = computeForce(
-  //     spheres[i].position.add(k3_p),
-  //     spheres[i - 1].position,
-  //     spheres[i + 1].position
-  //   ).scale(dt);
-  //   const k4_p = spheresV[i].add(k3_v).scale(dt);
-
-  //   newV[i] = spheresV[i].add(
-  //     k1_v
-  //       .add(k2_v.scale(2))
-  //       .add(k3_v.scale(2))
-  //       .add(k4_v)
-  //       .scale(1 / 6)
-  //   );
-  //   newPos[i] = spheres[i].position.add(
-  //     k1_p
-  //       .add(k2_p.scale(2))
-  //       .add(k3_p.scale(2))
-  //       .add(k4_p)
-  //       .scale(1 / 6)
-  //   );
-  // }
-
-  // newPos[0] = spheres[0].position.clone();
-  // newV[0] = spheresV[0].clone();
-  // newPos[spheres.length - 1] = spheres[spheres.length - 1].position.clone();
-  // newV[spheres.length - 1] = spheresV[spheres.length - 1].clone();
-
-  // ------
 
   let newPos = new Array(oneLineCount).fill(null).map(() => new Array(oneLineCount));
 
