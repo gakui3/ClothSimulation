@@ -239,7 +239,7 @@ function calculateForce(i, k) {
     .add(secondUpForce)
     .add(secondDownForce)
     .add(new BABYLON.Vector3(0, m * g, 0))
-    .add(new BABYLON.Vector3(0, 0, Math.sin(time) * 0.5));
+    .add(new BABYLON.Vector3(0, 0, Math.sin(time * 0.5) * 2));
   return force;
 }
 
