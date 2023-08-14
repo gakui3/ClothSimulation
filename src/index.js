@@ -12,18 +12,21 @@ camera.inputs.addMouseWheel();
 let spheresV = [];
 let paths = [];
 let options = [];
-const springConstant = 5.0; // N/m
+const springConstant = 5; // N/m
 const l_StructuralSpring = 1; // 構成バネの自然長 m
 const l_ShearSpring = Math.sqrt(
   l_StructuralSpring * l_StructuralSpring + l_StructuralSpring * l_StructuralSpring
 ); // 斜めバネ(せん断バネ)の自然長 m
 const l_BendSpring = 2; // 曲げバネの自然長 m
 const dt = 0.03;
-const m = 0.05; // kg
+const m = 0.1; // kg
 const g = -9.8; // m/s^2
 let time = 0;
 
 const oneLineCount = 10;
+
+//コリジョン用のsphere
+let sphereForCollision;
 
 let spheres = new Array(oneLineCount).fill(null).map(() => new Array(oneLineCount).fill(null));
 let spheresPrevPosition = new Array(oneLineCount)
@@ -36,6 +39,8 @@ camera.attachControl(canvas, true);
 
 const light = new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(0, 1, 0), scene);
 light.intensity = 0.7;
+
+addSphereForCollision(0, -2, 3);
 
 for (let i = 0; i < oneLineCount; i++) {
   for (let k = 0; k < oneLineCount; k++) {
@@ -244,7 +249,7 @@ function calculateTotalForce(i, k) {
     // .add(secondUpperLeftForce)
     // .add(secondUpperRightForce)
     .add(new BABYLON.Vector3(0, m * g, 0))
-    .add(new BABYLON.Vector3(0, 0, Math.sin(time * 0.5) * 2));
+    .add(new BABYLON.Vector3(0, 0, Math.sin(time * 0.5) * 6));
   return force;
 }
 
@@ -257,6 +262,14 @@ function calculateAcceleration(i, k) {
   force.add(adjustForce);
   const a = force.scale(1 / m);
   return a;
+}
+
+//コリジョン用のsphereを追加
+function addSphereForCollision(x, y, z) {
+  sphereForCollision = BABYLON.MeshBuilder.CreateSphere('sphere', { diameter: 4 }, scene);
+  sphereForCollision.position = new BABYLON.Vector3(x, y, z);
+  sphereForCollision.material = new BABYLON.StandardMaterial('sphereMaterial', scene);
+  sphereForCollision.material.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
 }
 
 // Render every frame
@@ -273,11 +286,21 @@ engine.runRenderLoop(() => {
           continue;
         }
         const a = calculateAcceleration(i, k);
-        const nextPos = spheres[i][k].position
+        let nextPos = spheres[i][k].position
           .clone()
           .scale(2)
           .subtract(spheresPrevPosition[i][k])
           .add(a.scale(dt * dt));
+
+        //衝突判定
+        const dist = nextPos.subtract(sphereForCollision.position).length();
+        if (dist <= 2.2) {
+          const vec = nextPos.clone().subtract(sphereForCollision.position).normalize();
+          const pos = sphereForCollision.position.clone().add(vec.scale(2.21));
+          nextPos = pos;
+          spheresPrevPosition[i][k] = pos;
+        }
+
         spheresPrevPosition[i][k] = spheres[i][k].position.clone();
         newPos[i][k] = nextPos;
       }
