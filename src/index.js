@@ -10,10 +10,16 @@ camera.setPosition(new BABYLON.Vector3(0, 0, 10));
 camera.inputs.addMouseWheel();
 
 let spheresV = [];
-const springConstant = 10.0; // N/m
-const l = 1; // m
+let paths = [];
+let options = [];
+const springConstant = 5.0; // N/m
+const l_StructuralSpring = 1; // 構成バネの自然長 m
+const l_ShearSpring = Math.sqrt(
+  l_StructuralSpring * l_StructuralSpring + l_StructuralSpring * l_StructuralSpring
+); // 斜めバネ(せん断バネ)の自然長 m
+const l_BendSpring = 2; // 曲げバネの自然長 m
 const dt = 0.03;
-const m = 0.1; // kg
+const m = 0.05; // kg
 const g = -9.8; // m/s^2
 let time = 0;
 
@@ -34,8 +40,8 @@ light.intensity = 0.7;
 for (let i = 0; i < oneLineCount; i++) {
   for (let k = 0; k < oneLineCount; k++) {
     const sphere = BABYLON.CreateSphere(i, { segments: 10, diameter: 0.25 }, scene);
-    const x = i * l - oneLineCount / 2;
-    const y = k * l - oneLineCount / 2;
+    const x = i * l_StructuralSpring - oneLineCount / 2;
+    const y = k * l_StructuralSpring - oneLineCount / 2;
     let p = new BABYLON.Vector3(x, y, 0);
     sphere.position = p;
     spheresPrevPosition[i][k] = p;
@@ -43,21 +49,74 @@ for (let i = 0; i < oneLineCount; i++) {
   }
 }
 
+//debug用のlineの作成
+//縦のline
+for (let i = 0; i < oneLineCount; i++) {
+  const path = [];
+  const option = {
+    points: path, //vec3 array,
+    updatable: true,
+  };
+  for (let k = 0; k < oneLineCount; k++) {
+    path.push(spheres[i][k].position);
+  }
+  const line = BABYLON.MeshBuilder.CreateLines('lines', option, scene);
+  debugLines.push(line);
+  paths.push(path);
+  options.push(option);
+}
+//横のline
+for (let i = 0; i < oneLineCount; i++) {
+  const path = [];
+  const option = {
+    points: path, //vec3 array,
+    updatable: true,
+  };
+  for (let k = 0; k < oneLineCount; k++) {
+    path.push(spheres[k][i].position);
+  }
+  const line = BABYLON.MeshBuilder.CreateLines('lines', option, scene);
+  debugLines.push(line);
+  paths.push(path);
+  options.push(option);
+}
+
+const updatePaths = () => {
+  for (let i = 0; i < oneLineCount; i++) {
+    for (let k = 0; k < oneLineCount; k++) {
+      paths[i][k] = spheres[i][k].position;
+    }
+    options[i].instance = debugLines[i];
+    BABYLON.MeshBuilder.CreateLines('lines', options[i]);
+  }
+  for (let i = 0; i < oneLineCount; i++) {
+    for (let k = 0; k < oneLineCount; k++) {
+      paths[i + oneLineCount][k] = spheres[k][i].position;
+    }
+    options[i + oneLineCount].instance = debugLines[i + oneLineCount];
+    BABYLON.MeshBuilder.CreateLines('lines', options[i + oneLineCount]);
+  }
+};
+
+scene.registerBeforeRender(function () {
+  updatePaths();
+});
+
 function computeForce(position, prevPosition, nextPosition) {
   const vec1 = position.subtract(prevPosition);
   const vec2 = position.subtract(nextPosition);
   const f1 = vec1
     .clone()
     .normalize()
-    .scale(-springConstant * (vec1.length() - l));
+    .scale(-springConstant * (vec1.length() - l_StructuralSpring));
   const f2 = vec2
     .clone()
     .normalize()
-    .scale(-springConstant * (vec2.length() - l));
+    .scale(-springConstant * (vec2.length() - l_StructuralSpring));
   return f1.add(f2);
 }
 
-function calculateForce(i, k, offset) {
+function calculateForce(i, k, offset, equilibriumLength) {
   let length = spheres[i][k].position
     .clone()
     .subtract(spheres[i + offset.x][k + offset.y].position)
@@ -66,7 +125,7 @@ function calculateForce(i, k, offset) {
     .clone()
     .subtract(spheres[i + offset.x][k + offset.y].position)
     .normalize();
-  const force = vec.scale(-1 * springConstant * (length - l));
+  const force = vec.scale(-1 * springConstant * (length - equilibriumLength));
   return force;
 }
 
@@ -93,78 +152,78 @@ function calculateTotalForce(i, k) {
 
   if (i !== 0) {
     //←
-    leftForce = calculateForce(i, k, { x: -1, y: 0 });
+    leftForce = calculateForce(i, k, { x: -1, y: 0 }, l_StructuralSpring);
 
     //↙
     if (k !== oneLineCount - 1) {
-      lowerLeftForce = calculateForce(i, k, { x: -1, y: 1 });
+      lowerLeftForce = calculateForce(i, k, { x: -1, y: 1 }, l_ShearSpring);
     }
 
     //←←
     if (i !== 1) {
-      secondLeftForce = calculateForce(i, k, { x: -2, y: 0 });
+      secondLeftForce = calculateForce(i, k, { x: -2, y: 0 }, l_BendSpring);
     }
 
     //↙↙
     if (k !== oneLineCount - 1 && i !== 1) {
-      secondLowerLeftForce = calculateForce(i, k, { x: -2, y: 1 });
+      secondLowerLeftForce = calculateForce(i, k, { x: -2, y: 1 }, l_BendSpring);
     }
   }
   if (i !== oneLineCount - 1) {
     //→
-    rightForce = calculateForce(i, k, { x: 1, y: 0 });
+    rightForce = calculateForce(i, k, { x: 1, y: 0 }, l_StructuralSpring);
 
     //↘
     if (k !== oneLineCount - 1) {
-      lowerRightForce = calculateForce(i, k, { x: 1, y: 1 });
+      lowerRightForce = calculateForce(i, k, { x: 1, y: 1 }, l_ShearSpring);
     }
 
     //→→
     if (i !== oneLineCount - 2) {
-      secondRightForce = calculateForce(i, k, { x: 2, y: 0 });
+      secondRightForce = calculateForce(i, k, { x: 2, y: 0 }, l_BendSpring);
     }
 
     //↘↘
     if (k !== oneLineCount - 1 && i !== oneLineCount - 2) {
-      secondLowerRightForce = calculateForce(i, k, { x: 2, y: 1 });
+      secondLowerRightForce = calculateForce(i, k, { x: 2, y: 1 }, l_BendSpring);
     }
   }
   if (k !== 0) {
     //↑
-    upForce = calculateForce(i, k, { x: 0, y: -1 });
+    upForce = calculateForce(i, k, { x: 0, y: -1 }, l_StructuralSpring);
 
     //↖
     if (i !== 0) {
-      upperLeftForce = calculateForce(i, k, { x: -1, y: -1 });
+      upperLeftForce = calculateForce(i, k, { x: -1, y: -1 }, l_ShearSpring);
     }
 
     //↗
     if (i !== oneLineCount - 1) {
-      upperRightForce = calculateForce(i, k, { x: 1, y: -1 });
+      upperRightForce = calculateForce(i, k, { x: 1, y: -1 }, l_ShearSpring);
     }
 
     //↑↑
     if (k !== 1) {
-      secondUpForce = calculateForce(i, k, { x: 0, y: -2 });
+      secondUpForce = calculateForce(i, k, { x: 0, y: -2 }, l_BendSpring);
     }
 
     //↖↖
     if (i !== 0 && k !== 1) {
-      secondUpperLeftForce = calculateForce(i, k, { x: -1, y: -2 });
+      secondUpperLeftForce = calculateForce(i, k, { x: -1, y: -2 }, l_BendSpring);
     }
 
     //↗↗
     if (i !== oneLineCount - 1 && k !== 1) {
-      secondUpperRightForce = calculateForce(i, k, { x: 1, y: -2 });
+      secondUpperRightForce = calculateForce(i, k, { x: 1, y: -2 }, l_BendSpring);
     }
   }
   if (k !== oneLineCount - 1) {
     //↓
-    downForce = calculateForce(i, k, { x: 0, y: 1 });
+    downForce = calculateForce(i, k, { x: 0, y: 1 }, l_StructuralSpring);
 
     //↓↓
     if (k !== oneLineCount - 2) {
-      secondDownForce = calculateForce(i, k, { x: 0, y: 2 });
+      secondDownForce = calculateForce(i, k, { x: 0, y: 2 }, l_BendSpring);
     }
   }
 
@@ -176,10 +235,10 @@ function calculateTotalForce(i, k) {
     .add(lowerRightForce)
     .add(upperLeftForce)
     .add(upperRightForce)
-    // .add(secondLeftForce)
-    // .add(secondRightForce)
-    // .add(secondUpForce)
-    // .add(secondDownForce)
+    .add(secondLeftForce)
+    .add(secondRightForce)
+    .add(secondUpForce)
+    .add(secondDownForce)
     // .add(secondLowerLeftForce)
     // .add(secondLowerRightForce)
     // .add(secondUpperLeftForce)
@@ -229,34 +288,6 @@ engine.runRenderLoop(() => {
   for (let i = 0; i < oneLineCount; i++) {
     for (let k = 0; k < oneLineCount; k++) {
       spheres[i][k].position = newPos[i][k];
-    }
-  }
-
-  if (debugLines.length > 0) {
-    debugLines.forEach((line) => {
-      line.dispose();
-    });
-    debugLines = [];
-  }
-  for (let i = 0; i < oneLineCount; i++) {
-    for (let k = 0; k < oneLineCount; k++) {
-      //debug用のlineを作成。各球の中心から右と下の球の中心に向かう線を作成
-      if (i !== oneLineCount - 1) {
-        const line = BABYLON.MeshBuilder.CreateLines(
-          'line',
-          { points: [spheres[i][k].position, spheres[i + 1][k].position] },
-          scene
-        );
-        debugLines.push(line);
-      }
-      if (k !== oneLineCount - 1) {
-        const line = BABYLON.MeshBuilder.CreateLines(
-          'line',
-          { points: [spheres[i][k].position, spheres[i][k + 1].position] },
-          scene
-        );
-        debugLines.push(line);
-      }
     }
   }
 
